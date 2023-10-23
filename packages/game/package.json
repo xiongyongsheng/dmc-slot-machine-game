@@ -1,0 +1,31 @@
+{
+  "name": "dmc-slot-machine-game",
+  "version": "0.0.1",
+  "description": "slot machine game",
+  "main": "index.js",
+  "config": {
+    "sign-git-tag": true,
+    "git-tag-version": true
+  },
+  "files": [
+    "./lib"
+  ],
+  "scripts": {
+    "dev": "node ./esbuild.config.js --dev",
+    "build": "node ./esbuild.config.js",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "game"
+  ],
+  "author": {
+    "name": "xiongyongsheng",
+    "email": "dmc-vergil@aliyun.com"
+  },
+  "repository": {
+    "type": "github",
+    "url": "https://github.com/xiongyongsheng/dmc-slot-machine-game"
+  },
+  "license": "ISC"
+}
