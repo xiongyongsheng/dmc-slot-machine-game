@@ -1,0 +1,48 @@
+.c-slot-machine-container {
+  --roller-height: 15vw;
+  --roller-cell-width: 18vw;
+  --roller-cell-height: 13vw;
+  --roller-padding: 7vw;
+  --roller-cell-font-size: 10vw;
+  --roller-margin: 1vw;
+  padding: 10px;
+  border: outset 10px #022e4f;
+  background: linear-gradient(
+    to top,
+    #000624 0%,
+    #033455 35%,
+    #6d8bab 60%,
+    #b3c9db 70%,
+    #b3c9db 75%,
+    #e6ecf5 75%,
+    #e6ecf5 87%,
+    #aecbe4 100%
+  );
+}
+.c-slot-machine-roller::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: inherit;
+  height: inherit;
+  box-sizing: border-box;
+  border: inset 3px #dee3ee;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 1) inset;
+  z-index: 5;
+}
+.c-slot-machine-roller::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: inherit;
+  height: inherit;
+  box-sizing: border-box;
+  background: linear-gradient(to top, #abbed0 0%, #fff 40%, #e6ecf5 65%, #8d8c8a 100%);
+  z-index: 3;
+  border-radius: 100px/500px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 1) inset;
+}
+.c-slot-machine-roller-child {
+}

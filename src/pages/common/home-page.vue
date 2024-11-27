@@ -1,7 +1,10 @@
 <template>
   <main>
     <section id="container"></section>
-    <button @click="start">start</button>
+    <form action="">
+      <button @click="start">start</button>
+      <button @click="stop">stop</button>
+    </form>
   </main>
 </template>
 <script setup>
@@ -12,10 +15,14 @@ let game;
 onMounted(() => {
   game = new SlotMachineGame({
     container: '#container',
-    start: ['banana', 'red-cherry', 'lemon', 'orange'],
+    // start: ['banana', 'banana', 'banana', 'banana'],
+    start: [0, 0, 0, 0],
+    rollerNum: 4,
+    stopMode: 'fast',
+    // stopMode: 'slow',
     // delay: 0,
     // randomMaxSpeed: false,
-    rollerType: 'image',
+    // rollerType: 'image',
     images: [
       {
         id: 'banana',
@@ -53,9 +60,28 @@ onMounted(() => {
 
 function start() {
   game.start();
-  setTimeout(() => {
-    // game.stop([1, 2, 3, 4]);
-    game.stop(['banana', 'red-cherry', 'lemon', 'orange']);
-  }, 6000);
+}
+function stop() {
+  game.stop([1, 2, 3, 4]);
+  // game.stop(['banana', 'red-cherry', 'lemon', 'orange']);
 }
 </script>
+
+<style>
+/* @import '../../style/demo.css'; */
+form {
+  padding: 20px;
+  gap: 10px;
+  display: flex;
+}
+button {
+  font-size: 20px;
+}
+#container {
+  background-color: lavender;
+  border: 18px solid salmon;
+  padding: 10px;
+  mask-border: url('https://developer.mozilla.org/zh-CN/docs/Web/CSS/mask-border/mask-border-diamonds.png')
+    30 / 36px 18px round;
+}
+</style>

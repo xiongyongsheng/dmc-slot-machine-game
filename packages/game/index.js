@@ -1,4 +1,4 @@
-import { isNumber, merge } from 'lodash';
+import { isNumber, last, merge } from 'lodash';
 
 class SlotMachineGame {
   #config = {
@@ -11,24 +11,35 @@ class SlotMachineGame {
     rollerMainElClassName: 'c-slot-machine-roller-main',
     rollerStoppingElClassName: 'c-slot-machine-roller-stopping',
     rollerTargetPreClassName: 'c-slot-machine-roller-target-pre',
-    rollerTargetNextClassName: 'c-slot-machine-roller-target-next'
+    rollerTargetNextClassName: 'c-slot-machine-roller-target-next',
+    rollerFirstCloneElClassName: 'c-slot-machine-roller-first',
+    rollerLastCloneElClassName: 'c-slot-machine-roller-last',
+    rollerSvgBlurElClassName: 'c-slot-machine-svg-blur'
   };
   #options = {
+    stopMode: 'fast',
     speed: 0.005,
     maxSpeed: 20,
     randomMaxSpeed: true,
     delay: 1,
-    stopSpeed: 10,
+    stopSpeed: 1,
     rollerNum: 4,
     rollerType: 'number',
     rollerMaxNumber: 9,
-    stopTimeout: 1500
+    stopTimeout: 1000,
+    blur: 4
   };
   set status(status) {
     this.containerEl.setAttribute('data-status', status);
   }
   get status() {
     return this.containerEl.getAttribute('data-status');
+  }
+  set stopMode(stopMode) {
+    this.containerEl.setAttribute('data-stop-mode', stopMode);
+  }
+  get stopMode() {
+    return this.containerEl.getAttribute('data-stop-mode');
   }
   constructor(options) {
     this.options = merge(this.#options, options);
@@ -37,11 +48,13 @@ class SlotMachineGame {
   init() {
     this.initDom();
     this.status = 'await';
+    this.stopMode = this.options.stopMode;
+    this.delay = (this.rollerEls.length - 1) * this.options.delay * 1000;
   }
   initDom() {
     this.containerEl = document.querySelector(this.options.container);
     this.containerEl.classList.add(this.#config.containerElClassName);
-    this.containerEl.style.setProperty('--stopTimeout', `${this.#options.stopTimeout}ms`);
+    this.containerEl.style.setProperty('--stopTimeout', `${this.options.stopTimeout}ms`);
     while (this.containerEl.firstChild) {
       this.containerEl.removeChild(this.containerEl.firstChild);
     }
@@ -53,12 +66,20 @@ class SlotMachineGame {
     );
     this.rollerEls.forEach((item) => {
       this.rollerGroupEl.appendChild(item);
-      setTimeout(() => {
-        item._rollerMainEl._translateY =
-          (item._rollerMainChild.length - item._mainTarget) * item._rollerMainChild[0].clientHeight;
-        this.handleTranslateY(item);
-      }, 1000);
+      item._rollerMainEl._translateY = -item._mainTarget * item._rollerMainChild[0].clientHeight;
+      this.handleTranslateY(item);
     });
+
+    this.svgEl = document.createElement('svg');
+    this.filterEl = document.createElement('filter');
+    this.filterEl.id = 'c-blur';
+    // this.feGaussianBlurEl = document.createElement('feGaussianBlur');
+    // this.feGaussianBlurEl.setAttribute('in', 'SourceGraphic');
+    // this.feGaussianBlurEl.setAttribute('stdDeviation', `0 ${this.options.blur}`);
+    // this.filterEl.appendChild(this.feGaussianBlurEl);
+    this.filterEl.innerHTML = `<feGaussianBlur in="SourceGraphic" stdDeviation="0 ${this.options.blur}" />`;
+    this.svgEl.appendChild(this.filterEl);
+    this.containerEl.appendChild(this.svgEl);
   }
   handleRollerEl(item, index) {
     const rollerEl = document.createElement('article');
@@ -82,7 +103,7 @@ class SlotMachineGame {
         }
         break;
       case 'image':
-        this.#options.images.forEach((item) => {
+        this.options.images.forEach((item) => {
           const rollerChildEl = document.createElement('div');
           rollerChildEl.classList.add(this.#config.rollerChildElClassName);
           rollerChildEl.setAttribute('data-col', index);
@@ -101,21 +122,34 @@ class SlotMachineGame {
     rollerEl.appendChild(rollerWrapperEl);
     rollerEl._rollerWrapperEl = rollerWrapperEl;
     rollerEl._rollerMainEl = rollerMainEl;
-    rollerEl._rollerMainChild = rollerEl._rollerMainEl.getElementsByClassName(
+    rollerEl._rollerMainChild = rollerMainEl.getElementsByClassName(
       this.#config.rollerChildElClassName
     );
+
     const firstEl = rollerEl._rollerMainChild[0];
     const firstCloneEl = firstEl.cloneNode(true);
+    firstCloneEl.classList.replace(
+      this.#config.rollerChildElClassName,
+      this.#config.rollerLastCloneElClassName
+    );
     const lastEl = rollerEl._rollerMainChild[rollerEl._rollerMainChild.length - 1];
     const lastCloneEl = lastEl.cloneNode(true);
+    lastCloneEl.classList.replace(
+      this.#config.rollerChildElClassName,
+      this.#config.rollerFirstCloneElClassName
+    );
     rollerMainEl.insertBefore(lastCloneEl, firstEl);
     rollerMainEl.appendChild(firstCloneEl);
     this.handleRemoveTargetClassName(rollerEl);
-    this.handleTarget(rollerEl, this.#options.start[index]);
+    this.handleTarget(rollerEl, this.options.start[index]);
     this.handleAddTargetClassName(rollerEl);
     return rollerEl;
   }
   start() {
+    if (this.status === 'start') return;
+    if (this.status === 'stop') {
+      this.init();
+    }
     this.nowTime = this.startTime = new Date().getTime();
     this.runningTime = 0;
     if (this.runningRAFId) {
@@ -129,15 +163,16 @@ class SlotMachineGame {
     const nowTime = new Date().getTime();
     this.runningTime = nowTime - this.startTime;
     this.rollerEls.forEach((item, index) => {
-      const delay = index * this.#options.delay * 1000;
+      const delay = index * this.options.delay * 1000;
       if (delay > this.runningTime) return;
       this.handleRemoveTargetClassName(item);
+      this.handleAddSvgFilter(item);
       if (!item._maxSpeed && this.options.randomMaxSpeed) {
-        item._maxSpeed = (Math.random() + 0.5) * this.#options.maxSpeed;
+        item._maxSpeed = (Math.random() + 0.5) * this.options.maxSpeed;
       }
       item._speed = Math.min(
-        (item._speed || 0) + this.#options.speed * (nowTime - this.nowTime),
-        item._maxSpeed || this.#options.maxSpeed
+        (item._speed || 0) + this.options.speed * (nowTime - this.nowTime),
+        item._maxSpeed || this.options.maxSpeed
       );
       this.handleTranslateY(item);
     });
@@ -146,20 +181,36 @@ class SlotMachineGame {
     this.runningRAFId = requestAnimationFrame(this.runningRequestAnimationFrame.bind(this));
   }
   stop(array) {
-    if (this.runningRAFId) {
-      cancelAnimationFrame(this.runningRAFId);
-      this.runningRAFId = null;
+    if (this.status === 'start' && this.delay < this.runningTime) {
+      if (this.runningRAFId) {
+        cancelAnimationFrame(this.runningRAFId);
+        this.runningRAFId = null;
+      }
+      this.rollerEls.forEach((item, index) => {
+        this.handleTarget(item, array[index]);
+        this.handleAddTargetClassName(item);
+        setTimeout(
+          () => {
+            this.handleRemoveSvgFilter(item);
+          },
+          index * this.options.delay * 1000
+        );
+        item._rollerMainEl._stopTranslateY =
+          -item._mainTarget * item._rollerMainChild[0].clientHeight;
+        item._loopNum = 0;
+      });
+      this.nowTime = this.stopTime = new Date().getTime();
+      switch (this.options.stopMode) {
+        case 'fast':
+          this.handleFastStop();
+          break;
+        case 'slow':
+          this.handleSlowStop();
+          break;
+      }
     }
-    this.rollerEls.forEach((item, index) => {
-      this.handleTarget(item, array[index]);
-      this.handleAddTargetClassName(item);
-      item._stopTimeTranslateY = item._rollerMainEl._translateY;
-      item._rollerMainEl._stopTranslateY =
-        (item._rollerMainChild.length - item._mainTarget) * item._rollerMainChild[0].clientHeight;
-      item._loopNum = 0;
-    });
-    this.nowTime = this.stopTime = new Date().getTime();
-    const delay = (this.rollerEls.length - 1) * this.#options.delay * 1000;
+  }
+  handleFastStop() {
     if (this.stopTimeout) {
       clearTimeout(this.stopTimeout);
     }
@@ -169,56 +220,89 @@ class SlotMachineGame {
         this.stopRAFId = null;
       }
       this.status = 'stop';
-    }, delay + this.#options.stopTimeout);
-    this.stopRequestAnimationFrame();
+    }, this.delay + this.options.stopTimeout);
+    this.handleFastStopRequestAnimationFrame();
   }
-  handleTarget(item, target) {
-    item._mainTarget = Number(
-      Array.prototype.indexOf.call(
-        Array.prototype.map.call(item._rollerMainChild, (item) => item.getAttribute('data-row')),
-        `${target}`
-      )
-    );
-  }
-  stopRequestAnimationFrame() {
+  handleFastStopRequestAnimationFrame() {
     const nowTime = new Date().getTime();
     this.stoppingTime = nowTime - this.stopTime;
     this.rollerEls.forEach((item, index) => {
-      const delay = index * this.#options.delay * 1000;
+      const delay = index * this.options.delay * 1000;
       if (delay < this.stoppingTime) {
         item.setAttribute('data-status', 'stopping');
-        const mainFlag =
-          Math.abs(item._rollerMainEl._translateY - item._rollerMainEl._stopTranslateY) <
-          this.#options.stopSpeed;
-        if (mainFlag) {
-          item._rollerMainEl._flag = false;
-          item._speed = 0;
-          item._rollerWrapperEl.classList.add(this.#config.rollerStoppingElClassName);
-          item._rollerMainEl._translateY = item._rollerMainEl._stopTranslateY;
-        } else {
-          item._speed = Math.max(
-            item._speed - this.#options.speed * (nowTime - this.nowTime),
-            this.#options.stopSpeed
-          );
-        }
+        item.classList.add(this.#config.rollerStoppingElClassName);
+        item._rollerMainEl._flag = false;
+        item._speed = 0;
+        item._rollerWrapperEl.style.setProperty('--translateFoldY', -1.5);
+        item._rollerMainEl._translateY = item._rollerMainEl._stopTranslateY;
       }
       this.handleTranslateY(item);
     });
     this.nowTime = nowTime;
     if (this.status !== 'stop') {
-      this.stopRAFId = requestAnimationFrame(this.stopRequestAnimationFrame.bind(this));
+      this.stopRAFId = requestAnimationFrame(this.handleFastStopRequestAnimationFrame.bind(this));
+    }
+  }
+  handleSlowStop() {
+    this.handleSlowStopRequestAnimationFrame();
+  }
+  handleSlowStopRequestAnimationFrame() {
+    const nowTime = new Date().getTime();
+    this.stoppingTime = nowTime - this.stopTime;
+    this.rollerEls.forEach((item, index) => {
+      const delay = index * this.options.delay * 1000;
+      if (delay < this.stoppingTime) {
+        item.setAttribute('data-status', 'stopping');
+        if (item._speed === 0) return;
+        item._speed = Math.max(
+          item._speed - this.options.speed * (nowTime - this.nowTime),
+          this.options.stopSpeed
+        );
+        if (this.options.stopSpeed === item._speed) {
+          const mainFlag =
+            Math.abs(
+              Math.abs(item._rollerMainEl._translateY) -
+                Math.abs(item._rollerMainEl._stopTranslateY)
+            ) <
+            item._rollerMainChild[0].clientHeight / 2;
+          if (mainFlag) {
+            item.classList.add(this.#config.rollerStoppingElClassName);
+            item.style.setProperty('--translateFoldY', -0.5);
+            item._rollerWrapperEl.style.setProperty('--translateFoldY', -0.8);
+            item._rollerMainEl._flag = false;
+            item._speed = 0;
+            item._rollerMainEl._translateY = item._rollerMainEl._stopTranslateY;
+          }
+        }
+      }
+      this.handleTranslateY(item);
+    });
+    this.nowTime = nowTime;
+    const flag = this.rollerEls.every((item) => item._speed === 0);
+    if (flag) {
+      if (this.stopTimeout) {
+        clearTimeout(this.stopTimeout);
+      }
+      this.stopTimeout = setTimeout(() => {
+        if (this.stopRAFId) {
+          cancelAnimationFrame(this.stopRAFId);
+          this.stopRAFId = null;
+        }
+        this.status = 'stop';
+      }, this.options.stopTimeout);
+    } else {
+      this.stopRAFId = requestAnimationFrame(this.handleSlowStopRequestAnimationFrame.bind(this));
     }
   }
   handleTranslateY(item) {
     if (item._rollerMainEl._flag) {
       item._rollerMainEl._translateY = 0;
-      //   item._rollerMainEl.style.top = `${-item._rollerMainEl.clientHeight}px`;
       item._rollerMainEl._flag = false;
       item._loopNum = item._loopNum++;
     }
-    item._rollerMainEl._translateY = (item._rollerMainEl._translateY || 0) + (item._speed || 0);
+    item._rollerMainEl._translateY = (item._rollerMainEl._translateY || 0) - (item._speed || 0);
     item._rollerMainEl.style.transform = `translateY(${item._rollerMainEl._translateY}px)`;
-    item._rollerMainEl._flag = item._rollerMainEl.clientHeight <= item._rollerMainEl._translateY;
+    item._rollerMainEl._flag = -item._rollerMainEl.clientHeight >= item._rollerMainEl._translateY;
   }
   handleRemoveTargetClassName(item) {
     Array.prototype.forEach.call(
@@ -245,6 +329,20 @@ class SlotMachineGame {
         this.#config.rollerTargetPreClassName
       );
     }
+  }
+  handleRemoveSvgFilter(item) {
+    item._rollerMainEl.classList.remove(this.#config.rollerSvgBlurElClassName);
+  }
+  handleAddSvgFilter(item) {
+    item._rollerMainEl.classList.add(this.#config.rollerSvgBlurElClassName);
+  }
+  handleTarget(item, target) {
+    item._mainTarget = Number(
+      Array.prototype.indexOf.call(
+        Array.prototype.map.call(item._rollerMainChild, (item) => item.getAttribute('data-row')),
+        `${target}`
+      )
+    );
   }
 }
 export default SlotMachineGame;
